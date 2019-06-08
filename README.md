@@ -32,6 +32,7 @@
   * [ssh_port.sh](#ssh_portsh)
 * [***VPN 相关***](#vpn相关)
   * [ocserv.sh](#ocservsh)
+  * [openconnect_vpn_server_install.sh](#OpenConnect VPN Server - 修订版)
 * [***DNS 相关***](#dns相关)
   * [dowsdns.sh](#dowsdnssh)
 * [***HTTP 相关***](#http相关)
@@ -354,11 +355,11 @@ wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/dou
 
 #### 下载安装:
 ``` bash
-wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/ocserv.sh && chmod +x ocserv.sh && bash ocserv.sh
+wget -N --no-check-certificate https://raw.githubusercontent.com/dzvision/doubi/master/ocserv.sh && chmod +x ocserv.sh && bash ocserv.sh
 ```
 
 ---
-## OpenConnect VPN Server
+## OpenConnect VPN Server - 修订版
 - 脚本说明: Ocserv AnyConnect 一键安装管理脚本 - 修订版
 - 系统支持: Debian7+ / Ubuntu14+
 
