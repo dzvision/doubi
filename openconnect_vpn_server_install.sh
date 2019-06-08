@@ -88,7 +88,7 @@ Download_ocserv(){
 #	./configure
 #===================================================================================================================================================================
 	[[ ! -s "ocserv-ocserv_0_12_3.tar.gz" ]] && echo -e "${Error} ocserv 源码文件下载失败 !" && rm -rf "ocserv/" && rm -rf "ocserv-ocserv_0_12_3.tar.gz" && exit 1
-	tar -xJf ocserv-ocserv_0_12_3.tar.gz && cd ocserv-0.12.3
+	tar -xf ocserv-ocserv_0_12_3.tar.gz && cd ocserv-0.12.3
 	./configure	
 	make
 	make install
