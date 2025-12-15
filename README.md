@@ -51,3 +51,4 @@ Please open an issue before submitting a PR if you want to discuss a change, esp
 - **v1.0.8:** Added firewalld support for RHEL systems, Added low-memory VPS optimizations, Added RHEL version-specific package handling
 - **v1.0.9:** Unified systemd service management across all platforms, Debian also using systemd instead
 - **v1.1.0:** Removed Debian source backup; if the installation still fails, switch to linuxmirrors.cn.
+- **v1.1.1:** Removed download ocserv.conf from github, directly put code in script.
