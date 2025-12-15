@@ -12,6 +12,7 @@ export PATH
 # Updated to support ocserv 1.3.0
 # Added RHEL/CentOS/Rocky/AlmaLinux support
 # RHEL uses firewalld, Debian uses iptables
+# Fixed low memory installation issues
 # Fixed dependencies for modern systems
 # Updated build process for GitLab source
 #=================================================
@@ -198,20 +199,32 @@ tls_www_server' > server.tmpl
 }
 Installation_dependency(){
 	[[ ! -e "/dev/net/tun" ]] && echo -e "${Error} 你的VPS没有开启TUN，请联系IDC或通过VPS控制面板打开TUN/TAP开关 !" && exit 1
+	
 	if [[ ${release} = "centos" ]]; then
 		# RHEL/CentOS/Rocky Linux/AlmaLinux dependencies
 		echo -e "${Info} 检测到 RHEL 系列系统，安装依赖..."
+		
 		# Enable EPEL repository for additional packages
+		echo -e "${Info} 启用 EPEL 仓库..."
 		yum install -y epel-release
-		# Basic build tools
-		yum install -y vim net-tools make automake gcc pkgconf-pkg-config autoconf libtool
-		# Required dependencies for ocserv 1.3.0
+		
+		# Install in smaller batches to reduce memory usage
+		echo -e "${Info} 安装基础工具 (1/4)..."
+		yum install -y vim net-tools make automake gcc
+		
+		echo -e "${Info} 安装构建工具 (2/4)..."
+		yum install -y pkgconf-pkg-config autoconf libtool
+		
+		echo -e "${Info} 安装必需依赖 (3/4)..."
 		yum install -y gnutls-devel libev-devel readline-devel
-		# Optional but recommended dependencies
+		
+		echo -e "${Info} 安装可选依赖 (4/4)..."
 		yum install -y pam-devel lz4-devel libseccomp-devel libnl3-devel \
 			krb5-devel radcli-devel libcurl-devel cjose-devel jansson-devel \
 			liboath-devel protobuf-c-devel libtalloc-devel protobuf-c gperf \
-			gnutls-utils iproute tcpdump
+			gnutls-utils iproute tcpdump 2>/dev/null || echo -e "${Tip} 部分可选包安装失败，不影响核心功能"
+		
+		echo -e "${Info} 依赖安装完成"
 		# Note: Some packages like llhttp-devel may not be available in all repos
 		# The configure script will detect and work without them
 	elif [[ ${release} = "debian" ]]; then
