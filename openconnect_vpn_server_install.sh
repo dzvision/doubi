@@ -5,7 +5,7 @@ export PATH
 #=================================================
 #	System Required: Debian/Ubuntu/RHEL/CentOS
 #	Description: ocserv AnyConnect
-#	Version: 1.0.8
+#	Version: 1.0.9
 #	Original Author: Toyo <=1.0.5 
 #   Updated by: dzvision, AI Qoder (ocserv 1.3.0)
 #=================================================
@@ -16,7 +16,7 @@ export PATH
 # Fixed dependencies for modern systems
 # Updated build process for GitLab source
 #=================================================
-sh_ver="1.0.8"
+sh_ver="1.0.9"
 file="/usr/local/sbin/ocserv"
 conf_file="/etc/ocserv"
 conf="/etc/ocserv/ocserv.conf"
@@ -119,9 +119,8 @@ Download_ocserv(){
 	fi
 }
 Service_ocserv(){
-	if [[ ${release} = "centos" ]]; then
-		# Create systemd service for RHEL/CentOS
-		cat > /usr/lib/systemd/system/ocserv.service << 'EOF'
+	# Modern systems (Debian 8+, Ubuntu 15.04+, RHEL 7+) use systemd
+	cat > /etc/systemd/system/ocserv.service << 'EOF'
 [Unit]
 Description=OpenConnect SSL VPN server
 Documentation=man:ocserv(8)
@@ -136,18 +135,9 @@ ExecReload=/bin/kill -HUP $MAINPID
 [Install]
 WantedBy=multi-user.target
 EOF
-		systemctl daemon-reload
-		systemctl enable ocserv
-		echo -e "${Info} ocserv systemd 服务配置完成 !"
-	else
-		# Debian/Ubuntu use init.d script
-		if ! wget --no-check-certificate https://raw.githubusercontent.com/dzvision/doubi/master/service/ocserv_debian -O /etc/init.d/ocserv; then
-			echo -e "${Error} ocserv 服务 管理脚本下载失败 !" && over
-		fi
-		chmod +x /etc/init.d/ocserv
-		update-rc.d -f ocserv defaults
-		echo -e "${Info} ocserv 服务 管理脚本下载完成 !"
-	fi
+	systemctl daemon-reload
+	systemctl enable ocserv
+	echo -e "${Info} ocserv systemd 服务配置完成 !"
 }
 rand(){
 	min=10000
@@ -370,11 +360,7 @@ Start_ocserv(){
 	check_installed_status
 	check_pid
 	[[ ! -z ${PID} ]] && echo -e "${Error} ocserv 正在运行，请检查 !" && exit 1
-	if [[ ${release} = "centos" ]]; then
-		systemctl start ocserv
-	else
-		/etc/init.d/ocserv start
-	fi
+	systemctl start ocserv
 	sleep 2s
 	check_pid
 	[[ ! -z ${PID} ]] && View_Config
@@ -383,21 +369,12 @@ Stop_ocserv(){
 	check_installed_status
 	check_pid
 	[[ -z ${PID} ]] && echo -e "${Error} ocserv 没有运行，请检查 !" && exit 1
-	if [[ ${release} = "centos" ]]; then
-		systemctl stop ocserv
-	else
-		/etc/init.d/ocserv stop
-	fi
+	systemctl stop ocserv
 }
 Restart_ocserv(){
 	check_installed_status
 	check_pid
-	if [[ ${release} = "centos" ]]; then
-		systemctl restart ocserv
-	else
-		[[ ! -z ${PID} ]] && /etc/init.d/ocserv stop
-		/etc/init.d/ocserv start
-	fi
+	systemctl restart ocserv
 	sleep 2s
 	check_pid
 	[[ ! -z ${PID} ]] && View_Config
@@ -836,4 +813,3 @@ case "$num" in
 	echo "请输入正确数字 [0-9]"
 	;;
 esac
-
