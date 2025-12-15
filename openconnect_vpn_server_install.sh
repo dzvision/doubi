@@ -95,7 +95,7 @@ Download_ocserv(){
 	# Configure with recommended options
 	echo -e "${Info} 配置编译选项..."
 	# Disable tests to avoid needing test-only dependencies
-	./configure --prefix=/usr/local --sysconfdir=/etc --disable-tests
+	./configure --prefix=/usr/local --sysconfdir=/etc
 	[[ $? != 0 ]] && echo -e "${Error} configure 执行失败 !" && exit 1
 	
 	# Build and install
@@ -204,28 +204,104 @@ Installation_dependency(){
 		# RHEL/CentOS/Rocky Linux/AlmaLinux dependencies
 		echo -e "${Info} 检测到 RHEL 系列系统，安装依赖..."
 		
-		# Enable EPEL repository for additional packages
-		echo -e "${Info} 启用 EPEL 仓库..."
-		yum install -y epel-release
+		# Check system resources for RHEL (EPEL installation is resource-intensive)
+		mem_total=$(free -m | awk '/^Mem:/{print $2}')
+		cpu_cores=$(nproc)
+		echo -e "${Info} 系统配置: CPU ${cpu_cores}核, 内存 ${mem_total}MB"
 		
-		# Install in smaller batches to reduce memory usage
+		if [ ${cpu_cores} -lt 2 ] || [ ${mem_total} -lt 1024 ]; then
+			echo -e "${Error} ==================== 重要警告 ===================="
+			echo -e "${Error} RHEL 系统的 EPEL 仓库和依赖安装对系统资源要求较高！"
+			echo -e "${Error} 当前配置: CPU ${cpu_cores}核, 内存 ${mem_total}MB"
+			echo -e "${Error} 最低要求: CPU 2核, 内存 1GB (1024MB)"
+			echo -e "${Error} "
+			echo -e "${Tip} 强烈建议: 使用 Ubuntu/Debian 系统来安装 ocserv！"
+			echo -e "${Tip} Ubuntu/Debian 对资源要求更低，安装更快速稳定。"
+			echo -e "${Error} ====================================================="
+			echo -e ""
+			read -e -p "是否强制继续在 RHEL 系统上安装? (可能失败) [y/N]: " force_install
+			[[ -z ${force_install} ]] && force_install="n"
+			if [[ ${force_install} != [Yy] ]]; then
+				echo -e "${Info} 已取消安装。请使用 Ubuntu 20.04/22.04 或 Debian 10/11 重试。"
+				exit 0
+			fi
+			echo -e "${Tip} 用户选择强制继续，如遇到问题请切换到 Ubuntu/Debian..."
+		fi
+		
+		# Clean yum cache to avoid issues
+		yum clean all 2>/dev/null
+		
+		# Enable CRB (CodeReady Builder) repository for RHEL 9
+		# This is required for protobuf-c-devel and other development packages
+		if command -v dnf &> /dev/null; then
+			echo -e "${Info} 启用 CRB (CodeReady Builder) 仓库..."
+			dnf config-manager --set-enabled crb 2>/dev/null || \
+			dnf config-manager --set-enabled powertools 2>/dev/null || \
+			echo -e "${Tip} CRB/PowerTools 仓库可能已启用或不可用"
+		fi
+		
+		# Install EPEL repository and configure mirror
+		echo -e "${Info} 配置 EPEL 仓库（使用清华镜像）..."
+		if command -v dnf &> /dev/null; then
+			dnf install -y epel-release
+		else
+			yum install -y epel-release
+		fi
+		
+		# Replace EPEL mirror with Tsinghua mirror for faster download
+		if [ -f /etc/yum.repos.d/epel.repo ]; then
+			sed -e 's!^metalink=!#metalink=!g' \
+				-e 's!^#baseurl=!baseurl=!g' \
+				-e 's!https\?://download\.fedoraproject\.org/pub/epel!https://mirrors.tuna.tsinghua.edu.cn/epel!g' \
+				-e 's!https\?://download\.example/pub/epel!https://mirrors.tuna.tsinghua.edu.cn/epel!g' \
+				-i /etc/yum.repos.d/epel.repo
+		fi
+		
+		if [ -f /etc/yum.repos.d/epel-testing.repo ]; then
+			sed -e 's!^metalink=!#metalink=!g' \
+				-e 's!^#baseurl=!baseurl=!g' \
+				-e 's!https\?://download\.fedoraproject\.org/pub/epel!https://mirrors.tuna.tsinghua.edu.cn/epel!g' \
+				-e 's!https\?://download\.example/pub/epel!https://mirrors.tuna.tsinghua.edu.cn/epel!g' \
+				-i /etc/yum.repos.d/epel-testing.repo
+		fi
+		
+		echo -e "${Info} EPEL 镜像配置完成"
+		
+		# Refresh metadata once to avoid repeated updates
+		echo -e "${Info} 刷新仓库元数据..."
+		yum makecache fast 2>/dev/null || yum makecache 2>/dev/null
+		
+		# Install in smaller batches to reduce memory usage and disk I/O
 		echo -e "${Info} 安装基础工具 (1/4)..."
-		yum install -y vim net-tools make automake gcc
+		yum install -y -q vim net-tools make automake gcc --setopt=keepcache=0
 		
 		echo -e "${Info} 安装构建工具 (2/4)..."
-		yum install -y pkgconf-pkg-config autoconf libtool
+		yum install -y -q pkgconf-pkg-config autoconf libtool --setopt=keepcache=0
 		
 		echo -e "${Info} 安装必需依赖 (3/4)..."
-		yum install -y gnutls-devel libev-devel readline-devel
+		# RHEL 8: libev-devel, RHEL 9: libev (from EPEL)
+		rhel_version=$(rpm -q --queryformat '%{VERSION}' centos-release 2>/dev/null || rpm -q --queryformat '%{VERSION}' redhat-release 2>/dev/null || rpm -q --queryformat '%{VERSION}' rocky-release 2>/dev/null || echo "8")
+		if [[ ${rhel_version} =~ ^9 ]]; then
+			# RHEL 9: libev package (no -devel suffix)
+			echo -e "${Info} RHEL 9 检测到，使用 libev 包..."
+			yum install -y -q gnutls-devel libev readline-devel nettle-devel --setopt=keepcache=0
+		else
+			# RHEL 7/8: libev-devel package
+			echo -e "${Info} RHEL 7/8 检测到，使用 libev-devel 包..."
+			yum install -y -q gnutls-devel libev-devel readline-devel nettle-devel --setopt=keepcache=0
+		fi
 		
 		echo -e "${Info} 安装可选依赖 (4/4)..."
-		yum install -y pam-devel lz4-devel libseccomp-devel libnl3-devel \
+		yum install -y -q pam-devel lz4-devel libseccomp-devel libnl3-devel \
 			krb5-devel radcli-devel libcurl-devel cjose-devel jansson-devel \
 			liboath-devel protobuf-c-devel libtalloc-devel protobuf-c gperf \
-			gnutls-utils iproute tcpdump 2>/dev/null || echo -e "${Tip} 部分可选包安装失败，不影响核心功能"
+			gnutls-utils iproute tcpdump --setopt=keepcache=0 2>/dev/null || echo -e "${Tip} 部分可选包安装失败，不影响核心功能"
+		
+		# Clean cache after installation to free disk space
+		yum clean all 2>/dev/null
 		
 		echo -e "${Info} 依赖安装完成"
-		# Note: Some packages like llhttp-devel may not be available in all repos
+		# Note: Some packages may not be available in base repos
 		# The configure script will detect and work without them
 	elif [[ ${release} = "debian" ]]; then
 		cat /etc/issue |grep 9\..*>/dev/null
@@ -760,3 +836,4 @@ case "$num" in
 	echo "请输入正确数字 [0-9]"
 	;;
 esac
+
