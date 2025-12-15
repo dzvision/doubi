@@ -3,17 +3,19 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
 export PATH
 
 #=================================================
-#	System Required: Debian/Ubuntu
+#	System Required: Debian/Ubuntu/RHEL/CentOS
 #	Description: ocserv AnyConnect
-#	Version: 1.0.7
+#	Version: 1.0.8
 #	Original Author: Toyo <=1.0.5 
-#   Updated by: qingmui (Updated for ocserv 1.3.0)
+#   Updated by: dzvision, AI Qoder (ocserv 1.3.0)
 #=================================================
 # Updated to support ocserv 1.3.0
-# Fixed dependencies for modern Debian/Ubuntu
+# Added RHEL/CentOS/Rocky/AlmaLinux support
+# RHEL uses firewalld, Debian uses iptables
+# Fixed dependencies for modern systems
 # Updated build process for GitLab source
 #=================================================
-sh_ver="1.0.7"
+sh_ver="1.0.8"
 file="/usr/local/sbin/ocserv"
 conf_file="/etc/ocserv"
 conf="/etc/ocserv/ocserv.conf"
@@ -116,12 +118,35 @@ Download_ocserv(){
 	fi
 }
 Service_ocserv(){
-	if ! wget --no-check-certificate https://raw.githubusercontent.com/dzvision/doubi/master/service/ocserv_debian -O /etc/init.d/ocserv; then
-		echo -e "${Error} ocserv 服务 管理脚本下载失败 !" && over
+	if [[ ${release} = "centos" ]]; then
+		# Create systemd service for RHEL/CentOS
+		cat > /usr/lib/systemd/system/ocserv.service << 'EOF'
+[Unit]
+Description=OpenConnect SSL VPN server
+Documentation=man:ocserv(8)
+After=network-online.target
+
+[Service]
+PrivateTmp=true
+PIDFile=/var/run/ocserv.pid
+ExecStart=/usr/local/sbin/ocserv --foreground --pid-file /var/run/ocserv.pid --config /etc/ocserv/ocserv.conf
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+EOF
+		systemctl daemon-reload
+		systemctl enable ocserv
+		echo -e "${Info} ocserv systemd 服务配置完成 !"
+	else
+		# Debian/Ubuntu use init.d script
+		if ! wget --no-check-certificate https://raw.githubusercontent.com/dzvision/doubi/master/service/ocserv_debian -O /etc/init.d/ocserv; then
+			echo -e "${Error} ocserv 服务 管理脚本下载失败 !" && over
+		fi
+		chmod +x /etc/init.d/ocserv
+		update-rc.d -f ocserv defaults
+		echo -e "${Info} ocserv 服务 管理脚本下载完成 !"
 	fi
-	chmod +x /etc/init.d/ocserv
-	update-rc.d -f ocserv defaults
-	echo -e "${Info} ocserv 服务 管理脚本下载完成 !"
 }
 rand(){
 	min=10000
@@ -174,7 +199,21 @@ tls_www_server' > server.tmpl
 Installation_dependency(){
 	[[ ! -e "/dev/net/tun" ]] && echo -e "${Error} 你的VPS没有开启TUN，请联系IDC或通过VPS控制面板打开TUN/TAP开关 !" && exit 1
 	if [[ ${release} = "centos" ]]; then
-		echo -e "${Error} 本脚本不支持 CentOS 系统 !" && exit 1
+		# RHEL/CentOS/Rocky Linux/AlmaLinux dependencies
+		echo -e "${Info} 检测到 RHEL 系列系统，安装依赖..."
+		# Enable EPEL repository for additional packages
+		yum install -y epel-release
+		# Basic build tools
+		yum install -y vim net-tools make automake gcc pkgconf-pkg-config autoconf libtool
+		# Required dependencies for ocserv 1.3.0
+		yum install -y gnutls-devel libev-devel readline-devel
+		# Optional but recommended dependencies
+		yum install -y pam-devel lz4-devel libseccomp-devel libnl3-devel \
+			krb5-devel radcli-devel libcurl-devel cjose-devel jansson-devel \
+			liboath-devel protobuf-c-devel libtalloc-devel protobuf-c gperf \
+			gnutls-utils iproute tcpdump
+		# Note: Some packages like llhttp-devel may not be available in all repos
+		# The configure script will detect and work without them
 	elif [[ ${release} = "debian" ]]; then
 		cat /etc/issue |grep 9\..*>/dev/null
 		if [[ $? = 0 ]]; then
@@ -242,7 +281,11 @@ Start_ocserv(){
 	check_installed_status
 	check_pid
 	[[ ! -z ${PID} ]] && echo -e "${Error} ocserv 正在运行，请检查 !" && exit 1
-	/etc/init.d/ocserv start
+	if [[ ${release} = "centos" ]]; then
+		systemctl start ocserv
+	else
+		/etc/init.d/ocserv start
+	fi
 	sleep 2s
 	check_pid
 	[[ ! -z ${PID} ]] && View_Config
@@ -251,13 +294,21 @@ Stop_ocserv(){
 	check_installed_status
 	check_pid
 	[[ -z ${PID} ]] && echo -e "${Error} ocserv 没有运行，请检查 !" && exit 1
-	/etc/init.d/ocserv stop
+	if [[ ${release} = "centos" ]]; then
+		systemctl stop ocserv
+	else
+		/etc/init.d/ocserv stop
+	fi
 }
 Restart_ocserv(){
 	check_installed_status
 	check_pid
-	[[ ! -z ${PID} ]] && /etc/init.d/ocserv stop
-	/etc/init.d/ocserv start
+	if [[ ${release} = "centos" ]]; then
+		systemctl restart ocserv
+	else
+		[[ ! -z ${PID} ]] && /etc/init.d/ocserv stop
+		/etc/init.d/ocserv start
+	fi
 	sleep 2s
 	check_pid
 	[[ ! -z ${PID} ]] && View_Config
@@ -478,8 +529,19 @@ Uninstall_ocserv(){
 		Read_config
 		Del_iptables
 		Save_iptables
-		update-rc.d -f ocserv remove
-		rm -rf /etc/init.d/ocserv
+		
+		if [[ ${release} = "centos" ]]; then
+			# RHEL/CentOS systemd service
+			systemctl disable ocserv 2>/dev/null
+			systemctl stop ocserv 2>/dev/null
+			rm -rf /usr/lib/systemd/system/ocserv.service
+			systemctl daemon-reload
+		else
+			# Debian/Ubuntu init.d script
+			update-rc.d -f ocserv remove
+			rm -rf /etc/init.d/ocserv
+		fi
+		
 		rm -rf "${conf_file}"
 		rm -rf "${log_file}"
 		cd '/usr/local/bin' && rm -f occtl
@@ -495,8 +557,17 @@ Uninstall_ocserv(){
 	fi
 }
 over(){
-	update-rc.d -f ocserv remove
-	rm -rf /etc/init.d/ocserv
+	if [[ ${release} = "centos" ]]; then
+		# RHEL/CentOS systemd service
+		systemctl disable ocserv 2>/dev/null
+		systemctl stop ocserv 2>/dev/null
+		rm -rf /usr/lib/systemd/system/ocserv.service
+		systemctl daemon-reload
+	else
+		# Debian/Ubuntu init.d script
+		update-rc.d -f ocserv remove 2>/dev/null
+		rm -rf /etc/init.d/ocserv
+	fi
 	rm -rf "${conf_file}"
 	rm -rf "${log_file}"
 	cd '/usr/local/bin' && rm -f occtl
@@ -509,49 +580,96 @@ over(){
 	echo && echo "安装过程错误，ocserv 卸载完成 !" && echo
 }
 Add_iptables(){
-	iptables -I INPUT -m state --state NEW -m tcp -p tcp --dport ${set_tcp_port} -j ACCEPT
-	iptables -I INPUT -m state --state NEW -m udp -p udp --dport ${set_udp_port} -j ACCEPT
+	if [[ ${release} = "centos" ]]; then
+		# RHEL/CentOS use firewalld
+		firewall-cmd --permanent --add-port=${set_tcp_port}/tcp
+		firewall-cmd --permanent --add-port=${set_udp_port}/udp
+		firewall-cmd --reload
+	else
+		# Debian/Ubuntu use iptables
+		iptables -I INPUT -m state --state NEW -m tcp -p tcp --dport ${set_tcp_port} -j ACCEPT
+		iptables -I INPUT -m state --state NEW -m udp -p udp --dport ${set_udp_port} -j ACCEPT
+	fi
 }
 Del_iptables(){
-	iptables -D INPUT -m state --state NEW -m tcp -p tcp --dport ${tcp_port} -j ACCEPT
-	iptables -D INPUT -m state --state NEW -m udp -p udp --dport ${udp_port} -j ACCEPT
+	if [[ ${release} = "centos" ]]; then
+		# RHEL/CentOS use firewalld
+		firewall-cmd --permanent --remove-port=${tcp_port}/tcp 2>/dev/null
+		firewall-cmd --permanent --remove-port=${udp_port}/udp 2>/dev/null
+		firewall-cmd --reload
+	else
+		# Debian/Ubuntu use iptables
+		iptables -D INPUT -m state --state NEW -m tcp -p tcp --dport ${tcp_port} -j ACCEPT
+		iptables -D INPUT -m state --state NEW -m udp -p udp --dport ${udp_port} -j ACCEPT
+	fi
 }
 Save_iptables(){
-	iptables-save > /etc/iptables.up.rules
+	if [[ ${release} = "centos" ]]; then
+		# RHEL/CentOS firewalld rules are already saved by firewall-cmd --permanent
+		echo -e "${Info} firewalld 规则已保存"
+	else
+		# Debian/Ubuntu save iptables rules
+		iptables-save > /etc/iptables.up.rules
+	fi
 }
 Set_iptables(){
 	echo -e "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 	sysctl -p
-	ifconfig_status=$(ifconfig)
-	if [[ -z ${ifconfig_status} ]]; then
-		echo -e "${Error} ifconfig 未安装 !"
-		read -e -p "请手动输入你的网卡名(一般情况下，网卡名为 eth0，Debian9 则为 ens3，CentOS Ubuntu 最新版本可能为 enpXsX(X代表数字或字母)，OpenVZ 虚拟化则为 venet0):" Network_card
-		[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
+	
+	if [[ ${release} = "centos" ]]; then
+		# RHEL/CentOS use firewalld
+		echo -e "${Info} 配置 firewalld 防火墙规则..."
+		
+		# Ensure firewalld is running
+		systemctl start firewalld 2>/dev/null
+		systemctl enable firewalld 2>/dev/null
+		
+		# Get default zone
+		default_zone=$(firewall-cmd --get-default-zone)
+		echo -e "${Info} 默认防火墙区域: ${default_zone}"
+		
+		# Enable masquerading for VPN
+		firewall-cmd --permanent --zone=${default_zone} --add-masquerade
+		
+		# Add rich rule for IP forwarding if needed
+		firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -j MASQUERADE
+		
+		# Reload firewalld
+		firewall-cmd --reload
+		echo -e "${Info} firewalld 配置完成"
 	else
-		Network_card=$(ifconfig|grep "eth0")
-		if [[ ! -z ${Network_card} ]]; then
-			Network_card="eth0"
+		# Debian/Ubuntu use iptables
+		ifconfig_status=$(ifconfig)
+		if [[ -z ${ifconfig_status} ]]; then
+			echo -e "${Error} ifconfig 未安装 !"
+			read -e -p "请手动输入你的网卡名(一般情况下，网卡名为 eth0，Debian9 则为 ens3，CentOS Ubuntu 最新版本可能为 enpXsX(X代表数字或字母)，OpenVZ 虚拟化则为 venet0):" Network_card
+			[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
 		else
-			Network_card=$(ifconfig|grep "ens3")
+			Network_card=$(ifconfig|grep "eth0")
 			if [[ ! -z ${Network_card} ]]; then
-				Network_card="ens3"
+				Network_card="eth0"
 			else
-				Network_card=$(ifconfig|grep "venet0")
+				Network_card=$(ifconfig|grep "ens3")
 				if [[ ! -z ${Network_card} ]]; then
-					Network_card="venet0"
+					Network_card="ens3"
 				else
-					ifconfig
-					read -e -p "检测到本服务器的网卡非 eth0 \ ens3(Debian9) \ venet0(OpenVZ) \ enpXsX(CentOS Ubuntu 最新版本，X代表数字或字母)，请根据上面输出的网卡信息手动输入你的网卡名:" Network_card
-					[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
+					Network_card=$(ifconfig|grep "venet0")
+					if [[ ! -z ${Network_card} ]]; then
+						Network_card="venet0"
+					else
+						ifconfig
+						read -e -p "检测到本服务器的网卡非 eth0 \ ens3(Debian9) \ venet0(OpenVZ) \ enpXsX(CentOS Ubuntu 最新版本，X代表数字或字母)，请根据上面输出的网卡信息手动输入你的网卡名:" Network_card
+						[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
+					fi
 				fi
 			fi
 		fi
+		iptables -t nat -A POSTROUTING -o ${Network_card} -j MASQUERADE
+		
+		iptables-save > /etc/iptables.up.rules
+		echo -e '#!/bin/bash\n/sbin/iptables-restore < /etc/iptables.up.rules' > /etc/network/if-pre-up.d/iptables
+		chmod +x /etc/network/if-pre-up.d/iptables
 	fi
-	iptables -t nat -A POSTROUTING -o ${Network_card} -j MASQUERADE
-	
-	iptables-save > /etc/iptables.up.rules
-	echo -e '#!/bin/bash\n/sbin/iptables-restore < /etc/iptables.up.rules' > /etc/network/if-pre-up.d/iptables
-	chmod +x /etc/network/if-pre-up.d/iptables
 }
 Update_Shell(){
 	sh_new_ver=$(wget --no-check-certificate -qO- -t1 -T3 "https://raw.githubusercontent.com/dzvision/doubi/master/ocserv.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
@@ -564,9 +682,9 @@ Update_Shell(){
 	echo -e "脚本已更新为最新版本[ ${sh_new_ver} ] !(注意：因为更新方式为直接覆盖当前运行的脚本，所以可能下面会提示一些报错，无视即可)" && exit 0
 }
 check_sys
-[[ ${release} != "debian" ]] && [[ ${release} != "ubuntu" ]] && echo -e "${Error} 本脚本不支持当前系统 ${release} !" && exit 1
+[[ ${release} != "debian" ]] && [[ ${release} != "ubuntu" ]] && [[ ${release} != "centos" ]] && echo -e "${Error} 本脚本不支持当前系统 ${release} !" && exit 1
 echo && echo -e " ocserv 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}]${Font_color_suffix}
-  -- Toyo | doub.io/vpnzy-7 --
+  -- Toyo <=1.0.5, dzvision 1.0.6, AI Qoder >=1.0.7 --
   
  ${Green_font_prefix}0.${Font_color_suffix} 升级脚本
 ————————————
