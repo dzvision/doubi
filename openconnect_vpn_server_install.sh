@@ -91,7 +91,8 @@ Download_ocserv(){
 	
 	# Configure with recommended options
 	echo -e "${Info} 配置编译选项..."
-	./configure --prefix=/usr/local --sysconfdir=/etc
+	# Disable tests to avoid needing test-only dependencies
+	./configure --prefix=/usr/local --sysconfdir=/etc --disable-tests
 	[[ $? != 0 ]] && echo -e "${Error} configure 执行失败 !" && exit 1
 	
 	# Build and install
@@ -185,7 +186,7 @@ Installation_dependency(){
 			# Optional but recommended dependencies
 			apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
 				libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
-				liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin
+				liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
 		else
 			mv /etc/apt/sources.list /etc/apt/sources.list.bak
 			wget --no-check-certificate -O "/etc/apt/sources.list" "https://raw.githubusercontent.com/dzvision/doubi/master/sources/us.sources.list"
@@ -197,7 +198,7 @@ Installation_dependency(){
 			# Optional but recommended dependencies
 			apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
 				libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
-				liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin
+				liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
 			rm -rf /etc/apt/sources.list
 			mv /etc/apt/sources.list.bak /etc/apt/sources.list
 			apt-get update
@@ -211,7 +212,7 @@ Installation_dependency(){
 		# Optional but recommended dependencies
 		apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
 			libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
-			liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin
+			liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
 	fi
 }
 Install_ocserv(){
