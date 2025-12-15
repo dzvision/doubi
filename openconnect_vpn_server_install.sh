@@ -5,9 +5,9 @@ export PATH
 #=================================================
 #	System Required: Debian/Ubuntu/RHEL/CentOS
 #	Description: ocserv AnyConnect
-#	Version: 1.0.9
+#	Version: 1.1.0
 #	Original Author: Toyo <=1.0.5 
-#   Updated by: dzvision, AI Qoder (ocserv 1.3.0)
+#   Updated by: dzvision, AI Qoder and Trae
 #=================================================
 # Updated to support ocserv 1.3.0
 # Added RHEL/CentOS/Rocky/AlmaLinux support
@@ -16,7 +16,7 @@ export PATH
 # Fixed dependencies for modern systems
 # Updated build process for GitLab source
 #=================================================
-sh_ver="1.0.9"
+sh_ver="1.1.0"
 file="/usr/local/sbin/ocserv"
 conf_file="/etc/ocserv"
 conf="/etc/ocserv/ocserv.conf"
@@ -294,32 +294,23 @@ Installation_dependency(){
 		# Note: Some packages may not be available in base repos
 		# The configure script will detect and work without them
 	elif [[ ${release} = "debian" ]]; then
-		cat /etc/issue |grep 9\..*>/dev/null
-		if [[ $? = 0 ]]; then
-			apt-get update
-			# Basic build tools
-			apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool
-			# Required dependencies for ocserv 1.3.0
-			apt-get install -y libgnutls28-dev libev-dev libreadline-dev
-			# Optional but recommended dependencies
-			apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
-				libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
-				liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
-		else
-			mv /etc/apt/sources.list /etc/apt/sources.list.bak
-			wget --no-check-certificate -O "/etc/apt/sources.list" "https://raw.githubusercontent.com/dzvision/openconnect-install/master/sources/us.sources.list"
-			apt-get update
-			# Basic build tools
-			apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool
-			# Required dependencies for ocserv 1.3.0
-			apt-get install -y libgnutls28-dev libev-dev libreadline-dev
-			# Optional but recommended dependencies
-			apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
-				libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
-				liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
-			rm -rf /etc/apt/sources.list
-			mv /etc/apt/sources.list.bak /etc/apt/sources.list
-			apt-get update
+		echo -e "${Info} 检测到 Debian 系统，使用默认源安装依赖..."
+		apt-get update
+		# Basic build tools
+		apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool
+		# Required dependencies for ocserv 1.3.0
+		apt-get install -y libgnutls28-dev libev-dev libreadline-dev
+		# Optional but recommended dependencies
+		apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
+			libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
+			liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
+		
+		# Check if installation was successful
+		if [[ $? != 0 ]]; then
+			echo -e "${Error} 依赖安装失败，可能是因为系统源的问题。"
+			echo -e "${Tip} 推荐使用 linuxmirrors.cn 提供的脚本更换国内源后重试。"
+			echo -e "${Tip} 使用方法: curl -sSL https://linuxmirrors.cn/main.sh | bash"
+			exit 1
 		fi
 	else
 		apt-get update
@@ -750,7 +741,7 @@ Update_Shell(){
 check_sys
 [[ ${release} != "debian" ]] && [[ ${release} != "ubuntu" ]] && [[ ${release} != "centos" ]] && echo -e "${Error} 本脚本不支持当前系统 ${release} !" && exit 1
 echo && echo -e " ocserv 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}]${Font_color_suffix}
-  -- Toyo <=1.0.5, dzvision 1.0.6, AI Qoder >=1.0.7 --
+  -- Toyo <=1.0.5, dzvision 1.0.6, AI >=1.0.7 --
   
  ${Green_font_prefix}0.${Font_color_suffix} 升级脚本
 ————————————

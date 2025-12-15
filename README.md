@@ -49,4 +49,5 @@ Please open an issue before submitting a PR if you want to discuss a change, esp
 - **v1.0.6:** Jun 8, 2019 - Debian/Ubuntu only, Originally FTP switch to Gitlab and upgrade to using ocserv 0.12.3
 - **v1.0.7:** Debian/Ubuntu + RHEL/CentOS/Rocky/AlmaLinux, ocserv upgrade to 1.3.0
 - **v1.0.8:** Added firewalld support for RHEL systems, Added low-memory VPS optimizations, Added RHEL version-specific package handling
-- **v1.0.9:** Unified systemd service management across all platforms, Debian using start using systemd
+- **v1.0.9:** Unified systemd service management across all platforms, Debian also using systemd instead
+- **v1.1.0:** Removed Debian source backup; if the installation still fails, switch to linuxmirrors.cn.
