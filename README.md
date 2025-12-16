@@ -18,12 +18,12 @@ Download and execute the script. Answer the questions asked by the script and it
 
 Option 1: WGET
 ```sh
-wget -N --no-check-certificate https://raw.githubusercontent.com/dzvision/openconnect-install/master/openconnect_vpn_server_install.sh && chmod +x openconnect_vpn_server_install.sh && bash openconnect_vpn_server_install.sh
+wget -N --no-check-certificate https://raw.githubusercontent.com/dzvision/openconnect-install/main/openconnect_vpn_server_install.sh && chmod +x openconnect_vpn_server_install.sh && bash openconnect_vpn_server_install.sh
 ```
 
 Option 2: CURL
 ```bash
-curl -O https://raw.githubusercontent.com/dzvision/openconnect-install/master/openconnect_vpn_server_install.sh
+curl -O https://raw.githubusercontent.com/dzvision/openconnect-install/main/openconnect_vpn_server_install.sh
 chmod +x openconnect_vpn_server_install.sh
 ./openconnect_vpn_server_installl.sh
 ```
@@ -52,3 +52,5 @@ Please open an issue before submitting a PR if you want to discuss a change, esp
 - **v1.0.9:** Unified systemd service management across all platforms, Debian also using systemd instead
 - **v1.1.0:** Removed Debian source backup; if the installation still fails, switch to linuxmirrors.cn.
 - **v1.1.1:** Removed download ocserv.conf from github, directly put code in script.
+- **v1.1.2:** Optimize display wording on Debian when apt-get install.
+- **v1.1.3:** Repair ronn on RHEL and Debian.

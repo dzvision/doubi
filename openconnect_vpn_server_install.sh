@@ -5,7 +5,7 @@ export PATH
 #=================================================
 #	System Required: Debian/Ubuntu/RHEL/CentOS
 #	Description: ocserv AnyConnect
-#	Version: 1.1.1
+#	Version: 1.1.3
 #	Original Author: Toyo <=1.0.5 
 #   Updated by: dzvision, AI Qoder and Trae
 #=================================================
@@ -16,7 +16,7 @@ export PATH
 # Fixed dependencies for modern systems
 # Updated build process for GitLab source
 #=================================================
-sh_ver="1.1.1"
+sh_ver="1.1.3"
 file="/usr/local/sbin/ocserv"
 conf_file="/etc/ocserv"
 conf="/etc/ocserv/ocserv.conf"
@@ -521,11 +521,11 @@ Installation_dependency(){
 		yum makecache fast 2>/dev/null || yum makecache 2>/dev/null
 		
 		# Install in smaller batches to reduce memory usage and disk I/O
-		echo -e "${Info} 安装基础工具 (1/4)..."
+		echo -e "${Info} 安装构建工具 (1/4)..."
 		yum install -y -q vim net-tools make automake gcc --setopt=keepcache=0
 		
-		echo -e "${Info} 安装构建工具 (2/4)..."
-		yum install -y -q pkgconf-pkg-config autoconf libtool --setopt=keepcache=0
+		echo -e "${Info} 安装构建辅助工具 (2/4)..."
+		yum install -y -q pkgconf-pkg-config autoconf libtool rubygem-ronn-ng --setopt=keepcache=0
 		
 		echo -e "${Info} 安装必需依赖 (3/4)..."
 		# RHEL 8: libev-devel, RHEL 9: libev (from EPEL)
@@ -555,11 +555,14 @@ Installation_dependency(){
 	elif [[ ${release} = "debian" ]]; then
 		echo -e "${Info} 检测到 Debian 系统，使用默认源安装依赖..."
 		apt-get update
-		# Basic build tools
-		apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool
-		# Required dependencies for ocserv 1.3.0
+		# 安装构建工具
+		echo -e "${Info} 安装构建工具 (1/3)..."
+		apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool ronn
+		# 安装必需依赖
+		echo -e "${Info} 安装必需依赖 (2/3)..."
 		apt-get install -y libgnutls28-dev libev-dev libreadline-dev
-		# Optional but recommended dependencies
+		# 安装可选依赖
+		echo -e "${Info} 安装可选依赖 (3/3)..."
 		apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
 			libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
 			liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
@@ -573,11 +576,14 @@ Installation_dependency(){
 		fi
 	else
 		apt-get update
-		# Basic build tools
-		apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool
-		# Required dependencies for ocserv 1.3.0
+		# 安装构建工具
+		echo -e "${Info} 安装构建工具 (1/3)..."
+		apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool ronn
+		# 安装必需依赖
+		echo -e "${Info} 安装必需依赖 (2/3)..."
 		apt-get install -y libgnutls28-dev libev-dev libreadline-dev
-		# Optional but recommended dependencies
+		# 安装可选依赖
+		echo -e "${Info} 安装可选依赖 (3/3)..."
 		apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
 			libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
 			liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
@@ -988,13 +994,13 @@ Set_iptables(){
 	fi
 }
 Update_Shell(){
-	sh_new_ver=$(wget --no-check-certificate -qO- -t1 -T3 "https://raw.githubusercontent.com/dzvision/openconnect-install/master/openconnect_vpn_server_installl.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
+	sh_new_ver=$(wget --no-check-certificate -qO- -t1 -T3 "https://raw.githubusercontent.com/dzvision/openconnect-install/main/openconnect_vpn_server_installl.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
 	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 无法链接到 Github !" && exit 0
 	if [[ -e "/etc/init.d/ocserv" ]]; then
 		rm -rf /etc/init.d/ocserv
 		Service_ocserv
 	fi
-	wget -N --no-check-certificate "https://raw.githubusercontent.com/dzvision/openconnect-install/master/openconnect_vpn_server_installl.sh" && chmod +x openconnect_vpn_server_installl.sh
+	wget -N --no-check-certificate "https://raw.githubusercontent.com/dzvision/openconnect-install/main/openconnect_vpn_server_installl.sh" && chmod +x openconnect_vpn_server_installl.sh
 	echo -e "脚本已更新为最新版本[ ${sh_new_ver} ] !(注意：因为更新方式为直接覆盖当前运行的脚本，所以可能下面会提示一些报错，无视即可)" && exit 0
 }
 check_sys
