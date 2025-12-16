@@ -18,12 +18,12 @@ Download and execute the script. Answer the questions asked by the script and it
 
 Option 1: WGET
 ```sh
-wget -N --no-check-certificate https://raw.githubusercontent.com/dzvision/openconnect-install/master/openconnect_vpn_server_install.sh && chmod +x openconnect_vpn_server_install.sh && bash openconnect_vpn_server_install.sh
+wget -N --no-check-certificate https://raw.githubusercontent.com/dzvision/openconnect-install/main/openconnect_vpn_server_install.sh && chmod +x openconnect_vpn_server_install.sh && bash openconnect_vpn_server_install.sh
 ```
 
 Option 2: CURL
 ```bash
-curl -O https://raw.githubusercontent.com/dzvision/openconnect-install/master/openconnect_vpn_server_install.sh
+curl -O https://raw.githubusercontent.com/dzvision/openconnect-install/main/openconnect_vpn_server_install.sh
 chmod +x openconnect_vpn_server_install.sh
 ./openconnect_vpn_server_installl.sh
 ```
@@ -49,4 +49,10 @@ Please open an issue before submitting a PR if you want to discuss a change, esp
 - **v1.0.6:** Jun 8, 2019 - Debian/Ubuntu only, Originally FTP switch to Gitlab and upgrade to using ocserv 0.12.3
 - **v1.0.7:** Debian/Ubuntu + RHEL/CentOS/Rocky/AlmaLinux, ocserv upgrade to 1.3.0
 - **v1.0.8:** Added firewalld support for RHEL systems, Added low-memory VPS optimizations, Added RHEL version-specific package handling
-- **v1.0.9:** Unified systemd service management across all platforms, Debian using start using systemd
+- **v1.0.9:** Unified systemd service management across all platforms, Debian also using systemd instead
+- **v1.1.0:** Removed Debian source backup; if the installation still fails, switch to linuxmirrors.cn.
+- **v1.1.1:** Removed download ocserv.conf from github, directly put code in script.
+- **v1.1.2:** Optimize display wording on Debian when apt-get install.
+- **v1.1.3:** Repair ronn on RHEL and Debian.
+- **v1.1.4:** Repair display error on RHEL when firewall is configured.
+- **v1.1.5:** 1. script run with display OS version; 2. Let AI to reference [linuxmirrors's script](https://github.com/SuperManito/LinuxMirrors/blob/main/ChangeMirrors.sh) of collect_system_info and and migrate to this bash.

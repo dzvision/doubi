@@ -5,25 +5,19 @@ export PATH
 #=================================================
 #	System Required: Debian/Ubuntu/RHEL/CentOS
 #	Description: ocserv AnyConnect
-#	Version: 1.0.9
-#	Original Author: Toyo <=1.0.5 
-#   Updated by: dzvision, AI Qoder (ocserv 1.3.0)
+#	Version: 1.1.5
+#	Original Author: Toyo <=1.0.5
+#   dzvision = 1.0.6
+#   AI Qoder and Trae >=1.0.7
 #=================================================
-# Updated to support ocserv 1.3.0
-# Added RHEL/CentOS/Rocky/AlmaLinux support
-# RHEL uses firewalld, Debian uses iptables
-# Fixed low memory installation issues
-# Fixed dependencies for modern systems
-# Updated build process for GitLab source
-#=================================================
-sh_ver="1.0.9"
+sh_ver="1.1.5"
 file="/usr/local/sbin/ocserv"
 conf_file="/etc/ocserv"
 conf="/etc/ocserv/ocserv.conf"
 passwd_file="/etc/ocserv/ocpasswd"
 log_file="/tmp/ocserv.log"
 #=================================================
-# Updated to latest stable version
+# OCServ Version
 #=================================================
 ocserv_ver="1.3.0"
 PID_FILE="/var/run/ocserv.pid"
@@ -38,22 +32,51 @@ check_root(){
 }
 #检查系统
 check_sys(){
-	if [[ -f /etc/redhat-release ]]; then
-		release="centos"
-	elif cat /etc/issue | grep -q -E -i "debian"; then
-		release="debian"
-	elif cat /etc/issue | grep -q -E -i "ubuntu"; then
-		release="ubuntu"
-	elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
-		release="centos"
-	elif cat /proc/version | grep -q -E -i "debian"; then
-		release="debian"
-	elif cat /proc/version | grep -q -E -i "ubuntu"; then
-		release="ubuntu"
-	elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
-		release="centos"
+    # 定义系统文件路径
+    File_LinuxRelease="/etc/os-release"
+    
+    # 初始化变量
+    release=""
+    rhel_major_version=""
+    
+    # 使用 /etc/os-release 文件进行系统检测
+    if [ -s "${File_LinuxRelease}" ]; then
+        # 从/etc/os-release文件中获取系统信息
+        SYSTEM_NAME="$(grep -E "^NAME=" $File_LinuxRelease | cut -d= -f2- | sed "s/[\'\"]//g")"
+        SYSTEM_VERSION_ID="$(grep -E "^VERSION_ID=" $File_LinuxRelease | cut -d= -f2- | sed "s/[\'\"]//g")"
+        SYSTEM_ID="$(grep -E "^ID=" $File_LinuxRelease | cut -d= -f2- | sed "s/[\'\"]//g")"
+        
+        # 获取主版本号
+        if [[ -n "${SYSTEM_VERSION_ID}" ]]; then
+            SYSTEM_VERSION_ID_MAJOR="${SYSTEM_VERSION_ID%%.*}"
+        fi
+        
+        # 根据系统ID判断发行版
+        case "${SYSTEM_ID}" in
+            debian)
+                release="debian"
+                ;;
+            ubuntu)
+                release="ubuntu"
+                ;;
+            centos|rhel|rocky|almalinux|oracle)
+                release="centos"
+                rhel_major_version="${SYSTEM_VERSION_ID_MAJOR:-8}"
+                ;;
+            *)
+                # 不支持的系统
+                release="unknown"
+                ;;
+        esac
+        
+        # 显示检测到的系统信息
+        echo -e "${Info} 检测到系统: ${SYSTEM_NAME} ${SYSTEM_VERSION_ID}"
+    else
+        # 如果没有 /etc/os-release 文件，标记为未知系统
+        release="unknown"
+        echo -e "${Error} 无法检测到受支持的操作系统，请确保您使用的是 Debian/Ubuntu/RHEL/CentOS/Rocky/AlmaLinux 系统"
+        exit 1
     fi
-	#bit=`uname -m`
 }
 check_installed_status(){
 	[[ ! -e ${file} ]] && echo -e "${Error} ocserv 没有安装，请检查 !" && exit 1
@@ -112,8 +135,267 @@ Download_ocserv(){
 	
 	if [[ -e ${file} ]]; then
 		mkdir "${conf_file}"
-		wget --no-check-certificate -N -P "${conf_file}" "https://raw.githubusercontent.com/dzvision/openconnect-install/master/other/ocserv.conf"
-		[[ ! -s "${conf}" ]] && echo -e "${Error} ocserv 配置文件下载失败 !" && rm -rf "${conf_file}" && exit 1
+		# 直接写入ocserv.conf配置文件，避免下载
+		# 原文下载路径doubi-original-backup/other/ocserv.conf
+	cat > "${conf}" << 'EOF'
+auth = "plain[passwd=/etc/ocserv/ocpasswd]"
+# listen-host = [IP|HOSTNAME]
+tcp-port = 443
+udp-port = 443
+run-as-user = nobody
+run-as-group = daemon
+socket-file = /var/run/ocserv-socket
+server-cert = /etc/ocserv/ssl/server-cert.pem
+server-key = /etc/ocserv/ssl/server-key.pem
+ca-cert = /etc/ocserv/ssl/ca-cert.pem
+isolate-workers = true
+banner = "Welcome DOUB.IO"
+max-clients = 0
+max-same-clients = 0
+rate-limit-ms = 0
+server-stats-reset-time = 604800
+keepalive = 32400
+dpd = 90
+mobile-dpd = 1800
+switch-to-tcp-timeout = 25
+try-mtu-discovery = false
+tls-priorities = "NORMAL:%SERVER_PRECEDENCE:%COMPAT:-VERS-SSL3.0"
+auth-timeout = 240
+idle-timeout = 86400
+mobile-idle-timeout = 86400
+min-reauth-time = 300
+max-ban-score = 80
+ban-reset-time = 1200
+cookie-timeout = 300
+deny-roaming = false
+rekey-time = 172800
+rekey-method = ssl
+use-occtl = true
+pid-file = /var/run/ocserv.pid
+net-priority = 6
+device = vpns
+predictable-ips = true
+default-domain = example.com
+
+ipv4-network = 192.168.1.0
+ipv4-netmask = 255.255.255.0
+# An alternative way of specifying the network:
+#ipv4-network = 192.168.1.0/24
+# The IPv6 subnet that leases will be given from.
+#ipv6-network = fda9:4efe:7e3b:03ea::/48 
+# Specify the size of the network to provide to clients. It is
+# generally recommended to provide clients with a /64 network in
+# IPv6, but any subnet may be specified. To provide clients only
+# with a single IP use the prefix 128.
+#ipv6-subnet-prefix = 128
+#ipv6-subnet-prefix = 64
+
+# tunnel-all-dns = true
+dns = 8.8.8.8
+dns = 8.8.4.4
+ping-leases = false
+no-route = 1.0.0.0/255.192.0.0
+no-route = 1.64.0.0/255.224.0.0
+no-route = 1.112.0.0/255.248.0.0
+no-route = 1.176.0.0/255.240.0.0
+no-route = 1.192.0.0/255.240.0.0
+no-route = 14.0.0.0/255.224.0.0
+no-route = 14.96.0.0/255.224.0.0
+no-route = 14.128.0.0/255.224.0.0
+no-route = 14.192.0.0/255.224.0.0
+no-route = 27.0.0.0/255.192.0.0
+no-route = 27.96.0.0/255.224.0.0
+no-route = 27.128.0.0/255.224.0.0
+no-route = 27.176.0.0/255.240.0.0
+no-route = 27.192.0.0/255.224.0.0
+no-route = 27.224.0.0/255.252.0.0
+no-route = 36.0.0.0/255.192.0.0
+no-route = 36.96.0.0/255.224.0.0
+no-route = 36.128.0.0/255.192.0.0
+no-route = 36.192.0.0/255.224.0.0
+no-route = 36.240.0.0/255.240.0.0
+no-route = 39.0.0.0/255.255.0.0
+no-route = 39.64.0.0/255.224.0.0
+no-route = 39.96.0.0/255.240.0.0
+no-route = 39.128.0.0/255.192.0.0
+no-route = 40.72.0.0/255.254.0.0
+no-route = 40.124.0.0/255.252.0.0
+no-route = 42.0.0.0/255.248.0.0
+no-route = 42.48.0.0/255.240.0.0
+no-route = 42.80.0.0/255.240.0.0
+no-route = 42.96.0.0/255.224.0.0
+no-route = 42.128.0.0/255.128.0.0
+no-route = 43.224.0.0/255.224.0.0
+no-route = 45.65.16.0/255.255.240.0
+no-route = 45.112.0.0/255.240.0.0
+no-route = 45.248.0.0/255.248.0.0
+no-route = 47.92.0.0/255.252.0.0
+no-route = 47.96.0.0/255.224.0.0
+no-route = 49.0.0.0/255.128.0.0
+no-route = 49.128.0.0/255.224.0.0
+no-route = 49.192.0.0/255.192.0.0
+no-route = 52.80.0.0/255.252.0.0
+no-route = 54.222.0.0/255.254.0.0
+no-route = 58.0.0.0/255.128.0.0
+no-route = 58.128.0.0/255.224.0.0
+no-route = 58.192.0.0/255.224.0.0
+no-route = 58.240.0.0/255.240.0.0
+no-route = 59.32.0.0/255.224.0.0
+no-route = 59.64.0.0/255.224.0.0
+no-route = 59.96.0.0/255.240.0.0
+no-route = 59.144.0.0/255.240.0.0
+no-route = 59.160.0.0/255.224.0.0
+no-route = 59.192.0.0/255.192.0.0
+no-route = 60.0.0.0/255.224.0.0
+no-route = 60.48.0.0/255.240.0.0
+no-route = 60.160.0.0/255.224.0.0
+no-route = 60.192.0.0/255.192.0.0
+no-route = 61.0.0.0/255.192.0.0
+no-route = 61.80.0.0/255.248.0.0
+no-route = 61.128.0.0/255.192.0.0
+no-route = 61.224.0.0/255.224.0.0
+no-route = 91.234.36.0/255.255.255.0
+no-route = 101.0.0.0/255.128.0.0
+no-route = 101.128.0.0/255.224.0.0
+no-route = 101.192.0.0/255.240.0.0
+no-route = 101.224.0.0/255.224.0.0
+no-route = 103.0.0.0/255.0.0.0
+no-route = 106.0.0.0/255.128.0.0
+no-route = 106.224.0.0/255.240.0.0
+no-route = 110.0.0.0/255.128.0.0
+no-route = 110.144.0.0/255.240.0.0
+no-route = 110.160.0.0/255.224.0.0
+no-route = 110.192.0.0/255.192.0.0
+no-route = 111.0.0.0/255.192.0.0
+no-route = 111.64.0.0/255.224.0.0
+no-route = 111.112.0.0/255.240.0.0
+no-route = 111.128.0.0/255.192.0.0
+no-route = 111.192.0.0/255.224.0.0
+no-route = 111.224.0.0/255.240.0.0
+no-route = 112.0.0.0/255.128.0.0
+no-route = 112.128.0.0/255.240.0.0
+no-route = 112.192.0.0/255.252.0.0
+no-route = 112.224.0.0/255.224.0.0
+no-route = 113.0.0.0/255.128.0.0
+no-route = 113.128.0.0/255.240.0.0
+no-route = 113.192.0.0/255.192.0.0
+no-route = 114.16.0.0/255.240.0.0
+no-route = 114.48.0.0/255.240.0.0
+no-route = 114.64.0.0/255.192.0.0
+no-route = 114.128.0.0/255.240.0.0
+no-route = 114.192.0.0/255.192.0.0
+no-route = 115.0.0.0/255.0.0.0
+no-route = 116.0.0.0/255.0.0.0
+no-route = 117.0.0.0/255.128.0.0
+no-route = 117.128.0.0/255.192.0.0
+no-route = 118.16.0.0/255.240.0.0
+no-route = 118.64.0.0/255.192.0.0
+no-route = 118.128.0.0/255.128.0.0
+no-route = 119.0.0.0/255.128.0.0
+no-route = 119.128.0.0/255.192.0.0
+no-route = 119.224.0.0/255.224.0.0
+no-route = 120.0.0.0/255.192.0.0
+no-route = 120.64.0.0/255.224.0.0
+no-route = 120.128.0.0/255.240.0.0
+no-route = 120.192.0.0/255.192.0.0
+no-route = 121.0.0.0/255.128.0.0
+no-route = 121.192.0.0/255.192.0.0
+no-route = 122.0.0.0/254.0.0.0
+no-route = 124.0.0.0/255.0.0.0
+no-route = 125.0.0.0/255.128.0.0
+no-route = 125.160.0.0/255.224.0.0
+no-route = 125.192.0.0/255.192.0.0
+no-route = 137.59.59.0/255.255.255.0
+no-route = 137.59.88.0/255.255.252.0
+no-route = 139.0.0.0/255.224.0.0
+no-route = 139.128.0.0/255.128.0.0
+no-route = 140.64.0.0/255.240.0.0
+no-route = 140.128.0.0/255.240.0.0
+no-route = 140.192.0.0/255.192.0.0
+no-route = 144.0.0.0/255.248.0.0
+no-route = 144.12.0.0/255.255.0.0
+no-route = 144.48.0.0/255.248.0.0
+no-route = 144.123.0.0/255.255.0.0
+no-route = 144.255.0.0/255.255.0.0
+no-route = 146.196.0.0/255.255.128.0
+no-route = 150.0.0.0/255.255.0.0
+no-route = 150.96.0.0/255.224.0.0
+no-route = 150.128.0.0/255.240.0.0
+no-route = 150.192.0.0/255.192.0.0
+no-route = 152.104.128.0/255.255.128.0
+no-route = 153.0.0.0/255.192.0.0
+no-route = 153.96.0.0/255.224.0.0
+no-route = 157.0.0.0/255.255.0.0
+no-route = 157.18.0.0/255.255.0.0
+no-route = 157.61.0.0/255.255.0.0
+no-route = 157.112.0.0/255.240.0.0
+no-route = 157.144.0.0/255.240.0.0
+no-route = 157.255.0.0/255.255.0.0
+no-route = 159.226.0.0/255.255.0.0
+no-route = 160.19.0.0/255.255.0.0
+no-route = 160.20.48.0/255.255.252.0
+no-route = 160.202.0.0/255.255.0.0
+no-route = 160.238.64.0/255.255.252.0
+no-route = 161.207.0.0/255.255.0.0
+no-route = 162.105.0.0/255.255.0.0
+no-route = 163.0.0.0/255.192.0.0
+no-route = 163.96.0.0/255.224.0.0
+no-route = 163.128.0.0/255.192.0.0
+no-route = 163.192.0.0/255.224.0.0
+no-route = 164.52.0.0/255.255.128.0
+no-route = 166.111.0.0/255.255.0.0
+no-route = 167.139.0.0/255.255.0.0
+no-route = 167.189.0.0/255.255.0.0
+no-route = 167.220.244.0/255.255.252.0
+no-route = 168.160.0.0/255.255.0.0
+no-route = 170.179.0.0/255.255.0.0
+no-route = 171.0.0.0/255.128.0.0
+no-route = 171.192.0.0/255.224.0.0
+no-route = 175.0.0.0/255.128.0.0
+no-route = 175.128.0.0/255.192.0.0
+no-route = 180.64.0.0/255.192.0.0
+no-route = 180.128.0.0/255.128.0.0
+no-route = 182.0.0.0/255.0.0.0
+no-route = 183.0.0.0/255.192.0.0
+no-route = 183.64.0.0/255.224.0.0
+no-route = 183.128.0.0/255.128.0.0
+no-route = 192.124.154.0/255.255.255.0
+no-route = 192.140.128.0/255.255.128.0
+no-route = 195.78.82.0/255.255.254.0
+no-route = 202.0.0.0/255.128.0.0
+no-route = 202.128.0.0/255.192.0.0
+no-route = 202.192.0.0/255.224.0.0
+no-route = 203.0.0.0/255.0.0.0
+no-route = 210.0.0.0/255.192.0.0
+no-route = 210.64.0.0/255.224.0.0
+no-route = 210.160.0.0/255.224.0.0
+no-route = 210.192.0.0/255.224.0.0
+no-route = 211.64.0.0/255.248.0.0
+no-route = 211.80.0.0/255.240.0.0
+no-route = 211.96.0.0/255.248.0.0
+no-route = 211.136.0.0/255.248.0.0
+no-route = 211.144.0.0/255.240.0.0
+no-route = 211.160.0.0/255.248.0.0
+no-route = 216.250.108.0/255.255.252.0
+no-route = 218.0.0.0/255.128.0.0
+no-route = 218.160.0.0/255.224.0.0
+no-route = 218.192.0.0/255.192.0.0
+no-route = 219.64.0.0/255.224.0.0
+no-route = 219.128.0.0/255.224.0.0
+no-route = 219.192.0.0/255.192.0.0
+no-route = 220.96.0.0/255.224.0.0
+no-route = 220.128.0.0/255.128.0.0
+no-route = 221.0.0.0/255.224.0.0
+no-route = 221.96.0.0/255.224.0.0
+no-route = 221.128.0.0/255.128.0.0
+no-route = 222.0.0.0/255.0.0.0
+no-route = 223.0.0.0/255.224.0.0
+no-route = 223.64.0.0/255.192.0.0
+no-route = 223.128.0.0/255.128.0.0
+cisco-client-compat = true
+dtls-legacy = true
+EOF
+		[[ ! -s "${conf}" ]] && echo -e "${Error} ocserv 配置文件创建失败 !" && rm -rf "${conf_file}" && exit 1
 	else
 		echo -e "${Error} ocserv 编译安装失败，请检查！" && exit 1
 	fi
@@ -203,7 +485,7 @@ Installation_dependency(){
 			echo -e "${Error} ==================== 重要警告 ===================="
 			echo -e "${Error} RHEL 系统的 EPEL 仓库和依赖安装对系统资源要求较高！"
 			echo -e "${Error} 当前配置: CPU ${cpu_cores}核, 内存 ${mem_total}MB"
-			echo -e "${Error} 最低要求: CPU 2核, 内存 1GB (1024MB)"
+			echo -e "${Error} 最低要求: CPU 2核, 内存 1GB (1024MB) RHEL <=8.10"
 			echo -e "${Error} "
 			echo -e "${Tip} 强烈建议: 使用 Ubuntu/Debian 系统来安装 ocserv！"
 			echo -e "${Tip} Ubuntu/Debian 对资源要求更低，安装更快速稳定。"
@@ -262,24 +544,17 @@ Installation_dependency(){
 		yum makecache fast 2>/dev/null || yum makecache 2>/dev/null
 		
 		# Install in smaller batches to reduce memory usage and disk I/O
-		echo -e "${Info} 安装基础工具 (1/4)..."
+		echo -e "${Info} 安装构建工具 (1/4)..."
 		yum install -y -q vim net-tools make automake gcc --setopt=keepcache=0
 		
-		echo -e "${Info} 安装构建工具 (2/4)..."
-		yum install -y -q pkgconf-pkg-config autoconf libtool --setopt=keepcache=0
+		echo -e "${Info} 安装构建辅助工具 (2/4)..."
+		yum install -y -q pkgconf-pkg-config autoconf libtool rubygem-ronn-ng --setopt=keepcache=0
 		
 		echo -e "${Info} 安装必需依赖 (3/4)..."
-		# RHEL 8: libev-devel, RHEL 9: libev (from EPEL)
-		rhel_version=$(rpm -q --queryformat '%{VERSION}' centos-release 2>/dev/null || rpm -q --queryformat '%{VERSION}' redhat-release 2>/dev/null || rpm -q --queryformat '%{VERSION}' rocky-release 2>/dev/null || echo "8")
-		if [[ ${rhel_version} =~ ^9 ]]; then
-			# RHEL 9: libev package (no -devel suffix)
-			echo -e "${Info} RHEL 9 检测到，使用 libev 包..."
-			yum install -y -q gnutls-devel libev readline-devel nettle-devel --setopt=keepcache=0
-		else
-			# RHEL 7/8: libev-devel package
-			echo -e "${Info} RHEL 7/8 检测到，使用 libev-devel 包..."
-			yum install -y -q gnutls-devel libev-devel readline-devel nettle-devel --setopt=keepcache=0
-		fi
+		
+		# 统一使用 libev-devel，适用于所有RHEL版本
+		echo -e "${Info} 安装必需依赖包..."
+		yum install -y -q gnutls-devel libev-devel readline-devel nettle-devel --setopt=keepcache=0
 		
 		echo -e "${Info} 安装可选依赖 (4/4)..."
 		yum install -y -q pam-devel lz4-devel libseccomp-devel libnl3-devel \
@@ -294,40 +569,37 @@ Installation_dependency(){
 		# Note: Some packages may not be available in base repos
 		# The configure script will detect and work without them
 	elif [[ ${release} = "debian" ]]; then
-		cat /etc/issue |grep 9\..*>/dev/null
-		if [[ $? = 0 ]]; then
-			apt-get update
-			# Basic build tools
-			apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool
-			# Required dependencies for ocserv 1.3.0
-			apt-get install -y libgnutls28-dev libev-dev libreadline-dev
-			# Optional but recommended dependencies
-			apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
-				libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
-				liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
-		else
-			mv /etc/apt/sources.list /etc/apt/sources.list.bak
-			wget --no-check-certificate -O "/etc/apt/sources.list" "https://raw.githubusercontent.com/dzvision/openconnect-install/master/sources/us.sources.list"
-			apt-get update
-			# Basic build tools
-			apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool
-			# Required dependencies for ocserv 1.3.0
-			apt-get install -y libgnutls28-dev libev-dev libreadline-dev
-			# Optional but recommended dependencies
-			apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
-				libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
-				liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
-			rm -rf /etc/apt/sources.list
-			mv /etc/apt/sources.list.bak /etc/apt/sources.list
-			apt-get update
+		echo -e "${Info} 检测到 Debian 系统，使用默认源安装依赖..."
+		apt-get update
+		# 安装构建工具
+		echo -e "${Info} 安装构建工具 (1/3)..."
+		apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool ronn
+		# 安装必需依赖
+		echo -e "${Info} 安装必需依赖 (2/3)..."
+		apt-get install -y libgnutls28-dev libev-dev libreadline-dev
+		# 安装可选依赖
+		echo -e "${Info} 安装可选依赖 (3/3)..."
+		apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
+			libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
+			liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
+		
+		# Check if installation was successful
+		if [[ $? != 0 ]]; then
+			echo -e "${Error} 依赖安装失败，可能是因为系统源的问题。"
+			echo -e "${Tip} 推荐使用 linuxmirrors.cn 提供的脚本更换国内源后重试。"
+			echo -e "${Tip} 使用方法: curl -sSL https://linuxmirrors.cn/main.sh | bash"
+			exit 1
 		fi
 	else
 		apt-get update
-		# Basic build tools
-		apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool
-		# Required dependencies for ocserv 1.3.0
+		# 安装构建工具
+		echo -e "${Info} 安装构建工具 (1/3)..."
+		apt-get install -y vim net-tools build-essential pkg-config autoconf automake libtool ronn
+		# 安装必需依赖
+		echo -e "${Info} 安装必需依赖 (2/3)..."
 		apt-get install -y libgnutls28-dev libev-dev libreadline-dev
-		# Optional but recommended dependencies
+		# 安装可选依赖
+		echo -e "${Info} 安装可选依赖 (3/3)..."
 		apt-get install -y libpam0g-dev liblz4-dev libseccomp-dev libnl-route-3-dev \
 			libkrb5-dev libradcli-dev libcurl4-gnutls-dev libcjose-dev libjansson-dev \
 			liboath-dev libprotobuf-c-dev libtalloc-dev protobuf-c-compiler gperf gnutls-bin ipcalc
@@ -347,11 +619,11 @@ Install_ocserv(){
 	echo -e "${Info} 开始设置账号配置..."
 	Read_config
 	Set_Config
-	echo -e "${Info} 开始设置 iptables防火墙..."
+	echo -e "${Info} 开始设置防火墙..."
 	Set_iptables
-	echo -e "${Info} 开始添加 iptables防火墙规则..."
+	echo -e "${Info} 开始添加防火墙规则..."
 	Add_iptables
-	echo -e "${Info} 开始保存 iptables防火墙规则..."
+	echo -e "${Info} 开始保存防火墙规则..."
 	Save_iptables
 	echo -e "${Info} 所有步骤 安装完毕，开始启动..."
 	Start_ocserv
@@ -738,19 +1010,19 @@ Set_iptables(){
 	fi
 }
 Update_Shell(){
-	sh_new_ver=$(wget --no-check-certificate -qO- -t1 -T3 "https://raw.githubusercontent.com/dzvision/openconnect-install/master/openconnect_vpn_server_installl.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
+	sh_new_ver=$(wget --no-check-certificate -qO- -t1 -T3 "https://raw.githubusercontent.com/dzvision/openconnect-install/main/openconnect_vpn_server_installl.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
 	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 无法链接到 Github !" && exit 0
 	if [[ -e "/etc/init.d/ocserv" ]]; then
 		rm -rf /etc/init.d/ocserv
 		Service_ocserv
 	fi
-	wget -N --no-check-certificate "https://raw.githubusercontent.com/dzvision/openconnect-install/master/openconnect_vpn_server_installl.sh" && chmod +x openconnect_vpn_server_installl.sh
+	wget -N --no-check-certificate "https://raw.githubusercontent.com/dzvision/openconnect-install/main/openconnect_vpn_server_installl.sh" && chmod +x openconnect_vpn_server_installl.sh
 	echo -e "脚本已更新为最新版本[ ${sh_new_ver} ] !(注意：因为更新方式为直接覆盖当前运行的脚本，所以可能下面会提示一些报错，无视即可)" && exit 0
 }
 check_sys
 [[ ${release} != "debian" ]] && [[ ${release} != "ubuntu" ]] && [[ ${release} != "centos" ]] && echo -e "${Error} 本脚本不支持当前系统 ${release} !" && exit 1
 echo && echo -e " ocserv 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}]${Font_color_suffix}
-  -- Toyo <=1.0.5, dzvision 1.0.6, AI Qoder >=1.0.7 --
+  -- Toyo <=1.0.5, dzvision 1.0.6, AI >=1.0.7 --
   
  ${Green_font_prefix}0.${Font_color_suffix} 升级脚本
 ————————————
@@ -813,3 +1085,4 @@ case "$num" in
 	echo "请输入正确数字 [0-9]"
 	;;
 esac
+
