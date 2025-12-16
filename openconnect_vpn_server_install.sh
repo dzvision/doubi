@@ -5,25 +5,19 @@ export PATH
 #=================================================
 #	System Required: Debian/Ubuntu/RHEL/CentOS
 #	Description: ocserv AnyConnect
-#	Version: 1.1.3
-#	Original Author: Toyo <=1.0.5 
-#   Updated by: dzvision, AI Qoder and Trae
+#	Version: 1.1.5
+#	Original Author: Toyo <=1.0.5
+#   dzvision = 1.0.6
+#   AI Qoder and Trae >=1.0.7
 #=================================================
-# Updated to support ocserv 1.3.0
-# Added RHEL/CentOS/Rocky/AlmaLinux support
-# RHEL uses firewalld, Debian uses iptables
-# Fixed low memory installation issues
-# Fixed dependencies for modern systems
-# Updated build process for GitLab source
-#=================================================
-sh_ver="1.1.3"
+sh_ver="1.1.5"
 file="/usr/local/sbin/ocserv"
 conf_file="/etc/ocserv"
 conf="/etc/ocserv/ocserv.conf"
 passwd_file="/etc/ocserv/ocpasswd"
 log_file="/tmp/ocserv.log"
 #=================================================
-# Updated to latest stable version
+# OCServ Version
 #=================================================
 ocserv_ver="1.3.0"
 PID_FILE="/var/run/ocserv.pid"
@@ -38,22 +32,51 @@ check_root(){
 }
 #检查系统
 check_sys(){
-	if [[ -f /etc/redhat-release ]]; then
-		release="centos"
-	elif cat /etc/issue | grep -q -E -i "debian"; then
-		release="debian"
-	elif cat /etc/issue | grep -q -E -i "ubuntu"; then
-		release="ubuntu"
-	elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
-		release="centos"
-	elif cat /proc/version | grep -q -E -i "debian"; then
-		release="debian"
-	elif cat /proc/version | grep -q -E -i "ubuntu"; then
-		release="ubuntu"
-	elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
-		release="centos"
+    # 定义系统文件路径
+    File_LinuxRelease="/etc/os-release"
+    
+    # 初始化变量
+    release=""
+    rhel_major_version=""
+    
+    # 使用 /etc/os-release 文件进行系统检测
+    if [ -s "${File_LinuxRelease}" ]; then
+        # 从/etc/os-release文件中获取系统信息
+        SYSTEM_NAME="$(grep -E "^NAME=" $File_LinuxRelease | cut -d= -f2- | sed "s/[\'\"]//g")"
+        SYSTEM_VERSION_ID="$(grep -E "^VERSION_ID=" $File_LinuxRelease | cut -d= -f2- | sed "s/[\'\"]//g")"
+        SYSTEM_ID="$(grep -E "^ID=" $File_LinuxRelease | cut -d= -f2- | sed "s/[\'\"]//g")"
+        
+        # 获取主版本号
+        if [[ -n "${SYSTEM_VERSION_ID}" ]]; then
+            SYSTEM_VERSION_ID_MAJOR="${SYSTEM_VERSION_ID%%.*}"
+        fi
+        
+        # 根据系统ID判断发行版
+        case "${SYSTEM_ID}" in
+            debian)
+                release="debian"
+                ;;
+            ubuntu)
+                release="ubuntu"
+                ;;
+            centos|rhel|rocky|almalinux|oracle)
+                release="centos"
+                rhel_major_version="${SYSTEM_VERSION_ID_MAJOR:-8}"
+                ;;
+            *)
+                # 不支持的系统
+                release="unknown"
+                ;;
+        esac
+        
+        # 显示检测到的系统信息
+        echo -e "${Info} 检测到系统: ${SYSTEM_NAME} ${SYSTEM_VERSION_ID}"
+    else
+        # 如果没有 /etc/os-release 文件，标记为未知系统
+        release="unknown"
+        echo -e "${Error} 无法检测到受支持的操作系统，请确保您使用的是 Debian/Ubuntu/RHEL/CentOS/Rocky/AlmaLinux 系统"
+        exit 1
     fi
-	#bit=`uname -m`
 }
 check_installed_status(){
 	[[ ! -e ${file} ]] && echo -e "${Error} ocserv 没有安装，请检查 !" && exit 1
@@ -462,7 +485,7 @@ Installation_dependency(){
 			echo -e "${Error} ==================== 重要警告 ===================="
 			echo -e "${Error} RHEL 系统的 EPEL 仓库和依赖安装对系统资源要求较高！"
 			echo -e "${Error} 当前配置: CPU ${cpu_cores}核, 内存 ${mem_total}MB"
-			echo -e "${Error} 最低要求: CPU 2核, 内存 1GB (1024MB)"
+			echo -e "${Error} 最低要求: CPU 2核, 内存 1GB (1024MB) RHEL <=8.10"
 			echo -e "${Error} "
 			echo -e "${Tip} 强烈建议: 使用 Ubuntu/Debian 系统来安装 ocserv！"
 			echo -e "${Tip} Ubuntu/Debian 对资源要求更低，安装更快速稳定。"
@@ -528,17 +551,10 @@ Installation_dependency(){
 		yum install -y -q pkgconf-pkg-config autoconf libtool rubygem-ronn-ng --setopt=keepcache=0
 		
 		echo -e "${Info} 安装必需依赖 (3/4)..."
-		# RHEL 8: libev-devel, RHEL 9: libev (from EPEL)
-		rhel_version=$(rpm -q --queryformat '%{VERSION}' centos-release 2>/dev/null || rpm -q --queryformat '%{VERSION}' redhat-release 2>/dev/null || rpm -q --queryformat '%{VERSION}' rocky-release 2>/dev/null || echo "8")
-		if [[ ${rhel_version} =~ ^9 ]]; then
-			# RHEL 9: libev package (no -devel suffix)
-			echo -e "${Info} RHEL 9 检测到，使用 libev 包..."
-			yum install -y -q gnutls-devel libev readline-devel nettle-devel --setopt=keepcache=0
-		else
-			# RHEL 7/8: libev-devel package
-			echo -e "${Info} RHEL 7/8 检测到，使用 libev-devel 包..."
-			yum install -y -q gnutls-devel libev-devel readline-devel nettle-devel --setopt=keepcache=0
-		fi
+		
+		# 统一使用 libev-devel，适用于所有RHEL版本
+		echo -e "${Info} 安装必需依赖包..."
+		yum install -y -q gnutls-devel libev-devel readline-devel nettle-devel --setopt=keepcache=0
 		
 		echo -e "${Info} 安装可选依赖 (4/4)..."
 		yum install -y -q pam-devel lz4-devel libseccomp-devel libnl3-devel \
@@ -603,11 +619,11 @@ Install_ocserv(){
 	echo -e "${Info} 开始设置账号配置..."
 	Read_config
 	Set_Config
-	echo -e "${Info} 开始设置 iptables防火墙..."
+	echo -e "${Info} 开始设置防火墙..."
 	Set_iptables
-	echo -e "${Info} 开始添加 iptables防火墙规则..."
+	echo -e "${Info} 开始添加防火墙规则..."
 	Add_iptables
-	echo -e "${Info} 开始保存 iptables防火墙规则..."
+	echo -e "${Info} 开始保存防火墙规则..."
 	Save_iptables
 	echo -e "${Info} 所有步骤 安装完毕，开始启动..."
 	Start_ocserv
@@ -1069,3 +1085,4 @@ case "$num" in
 	echo "请输入正确数字 [0-9]"
 	;;
 esac
+

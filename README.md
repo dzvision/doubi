@@ -54,3 +54,5 @@ Please open an issue before submitting a PR if you want to discuss a change, esp
 - **v1.1.1:** Removed download ocserv.conf from github, directly put code in script.
 - **v1.1.2:** Optimize display wording on Debian when apt-get install.
 - **v1.1.3:** Repair ronn on RHEL and Debian.
+- **v1.1.4:** Repair display error on RHEL when firewall is configured.
+- **v1.1.5:** 1. script run with display OS version; 2. Let AI to reference [linuxmirrors's script](https://github.com/SuperManito/LinuxMirrors/blob/main/ChangeMirrors.sh) of collect_system_info and and migrate to this bash.
