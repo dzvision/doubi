@@ -5,12 +5,12 @@ export PATH
 #=================================================
 #	System Required: Debian/Ubuntu/RHEL/CentOS
 #	Description: ocserv AnyConnect
-#	Version: 1.1.5
+#	Version: 1.1.6
 #	Original Author: Toyo <=1.0.5
 #   dzvision = 1.0.6
 #   AI Qoder and Trae >=1.0.7
 #=================================================
-sh_ver="1.1.5"
+sh_ver="1.1.6"
 file="/usr/local/sbin/ocserv"
 conf_file="/etc/ocserv"
 conf="/etc/ocserv/ocserv.conf"
@@ -920,25 +920,49 @@ over(){
 Add_iptables(){
 	if [[ ${release} = "centos" ]]; then
 		# RHEL/CentOS use firewalld
-		firewall-cmd --permanent --add-port=${set_tcp_port}/tcp
-		firewall-cmd --permanent --add-port=${set_udp_port}/udp
-		firewall-cmd --reload
+		# Check if firewalld is running
+		if systemctl is-active --quiet firewalld; then
+			firewall-cmd --permanent --add-port=${set_tcp_port}/tcp 2>/dev/null
+			firewall-cmd --permanent --add-port=${set_udp_port}/udp 2>/dev/null
+			firewall-cmd --reload 2>/dev/null
+			echo -e "${Info} firewalld 规则添加完成"
+		else
+			echo -e "${Info} firewalld 未运行，跳过添加防火墙规则..."
+		fi
 	else
 		# Debian/Ubuntu use iptables
-		iptables -I INPUT -m state --state NEW -m tcp -p tcp --dport ${set_tcp_port} -j ACCEPT
-		iptables -I INPUT -m state --state NEW -m udp -p udp --dport ${set_udp_port} -j ACCEPT
+		# Check if iptables is available
+		if command -v iptables >/dev/null 2>&1; then
+			iptables -I INPUT -m state --state NEW -m tcp -p tcp --dport ${set_tcp_port} -j ACCEPT 2>/dev/null
+			iptables -I INPUT -m state --state NEW -m udp -p udp --dport ${set_udp_port} -j ACCEPT 2>/dev/null
+			echo -e "${Info} iptables 规则添加完成"
+		else
+			echo -e "${Info} iptables 不可用，跳过添加防火墙规则..."
+		fi
 	fi
 }
 Del_iptables(){
 	if [[ ${release} = "centos" ]]; then
 		# RHEL/CentOS use firewalld
-		firewall-cmd --permanent --remove-port=${tcp_port}/tcp 2>/dev/null
-		firewall-cmd --permanent --remove-port=${udp_port}/udp 2>/dev/null
-		firewall-cmd --reload
+		# Check if firewalld is running
+		if systemctl is-active --quiet firewalld; then
+			firewall-cmd --permanent --remove-port=${tcp_port}/tcp 2>/dev/null
+			firewall-cmd --permanent --remove-port=${udp_port}/udp 2>/dev/null
+			firewall-cmd --reload 2>/dev/null
+			echo -e "${Info} firewalld 规则删除完成"
+		else
+			echo -e "${Info} firewalld 未运行，跳过删除防火墙规则..."
+		fi
 	else
 		# Debian/Ubuntu use iptables
-		iptables -D INPUT -m state --state NEW -m tcp -p tcp --dport ${tcp_port} -j ACCEPT
-		iptables -D INPUT -m state --state NEW -m udp -p udp --dport ${udp_port} -j ACCEPT
+		# Check if iptables is available
+		if command -v iptables >/dev/null 2>&1; then
+			iptables -D INPUT -m state --state NEW -m tcp -p tcp --dport ${tcp_port} -j ACCEPT 2>/dev/null
+			iptables -D INPUT -m state --state NEW -m udp -p udp --dport ${udp_port} -j ACCEPT 2>/dev/null
+			echo -e "${Info} iptables 规则删除完成"
+		else
+			echo -e "${Info} iptables 不可用，跳过删除防火墙规则..."
+		fi
 	fi
 }
 Save_iptables(){
@@ -947,7 +971,13 @@ Save_iptables(){
 		echo -e "${Info} firewalld 规则已保存"
 	else
 		# Debian/Ubuntu save iptables rules
-		iptables-save > /etc/iptables.up.rules
+		# Check if iptables is available
+		if command -v iptables >/dev/null 2>&1; then
+			iptables-save > /etc/iptables.up.rules 2>/dev/null
+			echo -e "${Info} iptables 规则已保存"
+		else
+			echo -e "${Info} iptables 不可用，跳过保存防火墙规则..."
+		fi
 	fi
 }
 Set_iptables(){
@@ -956,57 +986,63 @@ Set_iptables(){
 	
 	if [[ ${release} = "centos" ]]; then
 		# RHEL/CentOS use firewalld
-		echo -e "${Info} 配置 firewalld 防火墙规则..."
-		
-		# Ensure firewalld is running
-		systemctl start firewalld 2>/dev/null
-		systemctl enable firewalld 2>/dev/null
-		
-		# Get default zone
-		default_zone=$(firewall-cmd --get-default-zone)
-		echo -e "${Info} 默认防火墙区域: ${default_zone}"
-		
-		# Enable masquerading for VPN
-		firewall-cmd --permanent --zone=${default_zone} --add-masquerade
-		
-		# Add rich rule for IP forwarding if needed
-		firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -j MASQUERADE
-		
-		# Reload firewalld
-		firewall-cmd --reload
-		echo -e "${Info} firewalld 配置完成"
+		# Check if firewalld is running
+		if systemctl is-active --quiet firewalld; then
+			echo -e "${Info} 配置 firewalld 防火墙规则..."
+			
+			# Get default zone
+			default_zone=$(firewall-cmd --get-default-zone 2>/dev/null)
+			echo -e "${Info} 默认防火墙区域: ${default_zone}"
+			
+			# Enable masquerading for VPN
+			firewall-cmd --permanent --zone=${default_zone} --add-masquerade 2>/dev/null
+			
+			# Add rich rule for IP forwarding if needed
+			firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -j MASQUERADE 2>/dev/null
+			
+			# Reload firewalld
+			firewall-cmd --reload 2>/dev/null
+			echo -e "${Info} firewalld 配置完成"
+		else
+			echo -e "${Info} firewalld 未运行，跳过防火墙配置..."
+		fi
 	else
 		# Debian/Ubuntu use iptables
-		ifconfig_status=$(ifconfig)
-		if [[ -z ${ifconfig_status} ]]; then
-			echo -e "${Error} ifconfig 未安装 !"
-			read -e -p "请手动输入你的网卡名(一般情况下，网卡名为 eth0，Debian9 则为 ens3，CentOS Ubuntu 最新版本可能为 enpXsX(X代表数字或字母)，OpenVZ 虚拟化则为 venet0):" Network_card
-			[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
-		else
-			Network_card=$(ifconfig|grep "eth0")
-			if [[ ! -z ${Network_card} ]]; then
-				Network_card="eth0"
+		# Check if iptables is available and running
+		if command -v iptables >/dev/null 2>&1; then
+			ifconfig_status=$(ifconfig)
+			if [[ -z ${ifconfig_status} ]]; then
+				echo -e "${Error} ifconfig 未安装 !"
+				read -e -p "请手动输入你的网卡名(一般情况下，网卡名为 eth0，Debian9 则为 ens3，CentOS Ubuntu 最新版本可能为 enpXsX(X代表数字或字母)，OpenVZ 虚拟化则为 venet0):" Network_card
+				[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
 			else
-				Network_card=$(ifconfig|grep "ens3")
+				Network_card=$(ifconfig|grep "eth0")
 				if [[ ! -z ${Network_card} ]]; then
-					Network_card="ens3"
+					Network_card="eth0"
 				else
-					Network_card=$(ifconfig|grep "venet0")
+					Network_card=$(ifconfig|grep "ens3")
 					if [[ ! -z ${Network_card} ]]; then
-						Network_card="venet0"
+						Network_card="ens3"
 					else
-						ifconfig
-						read -e -p "检测到本服务器的网卡非 eth0 \ ens3(Debian9) \ venet0(OpenVZ) \ enpXsX(CentOS Ubuntu 最新版本，X代表数字或字母)，请根据上面输出的网卡信息手动输入你的网卡名:" Network_card
-						[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
+						Network_card=$(ifconfig|grep "venet0")
+						if [[ ! -z ${Network_card} ]]; then
+							Network_card="venet0"
+						else
+							ifconfig
+							read -e -p "检测到本服务器的网卡非 eth0 \ ens3(Debian9) \ venet0(OpenVZ) \ enpXsX(CentOS Ubuntu 最新版本，X代表数字或字母)，请根据上面输出的网卡信息手动输入你的网卡名:" Network_card
+							[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
+						fi
 					fi
 				fi
 			fi
+			iptables -t nat -A POSTROUTING -o ${Network_card} -j MASQUERADE 2>/dev/null
+			
+			iptables-save > /etc/iptables.up.rules 2>/dev/null
+			echo -e '#!/bin/bash\n/sbin/iptables-restore < /etc/iptables.up.rules' > /etc/network/if-pre-up.d/iptables 2>/dev/null
+			chmod +x /etc/network/if-pre-up.d/iptables 2>/dev/null
+		else
+			echo -e "${Info} iptables 不可用，跳过防火墙配置..."
 		fi
-		iptables -t nat -A POSTROUTING -o ${Network_card} -j MASQUERADE
-		
-		iptables-save > /etc/iptables.up.rules
-		echo -e '#!/bin/bash\n/sbin/iptables-restore < /etc/iptables.up.rules' > /etc/network/if-pre-up.d/iptables
-		chmod +x /etc/network/if-pre-up.d/iptables
 	fi
 }
 Update_Shell(){

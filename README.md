@@ -45,7 +45,7 @@ Contributions are welcome! Here's how you can help:
 
 Please open an issue before submitting a PR if you want to discuss a change, especially if it's a big one.
 
-## Version Update Changes
+## Changelog
 - **v1.0.6:** Jun 8, 2019 - Debian/Ubuntu only, Originally FTP switch to Gitlab and upgrade to using ocserv 0.12.3
 - **v1.0.7:** Debian/Ubuntu + RHEL/CentOS/Rocky/AlmaLinux, ocserv upgrade to 1.3.0
 - **v1.0.8:** Added firewalld support for RHEL systems, Added low-memory VPS optimizations, Added RHEL version-specific package handling
@@ -56,3 +56,4 @@ Please open an issue before submitting a PR if you want to discuss a change, esp
 - **v1.1.3:** Repair ronn on RHEL and Debian.
 - **v1.1.4:** Repair display error on RHEL when firewall is configured.
 - **v1.1.5:** 1. script run with display OS version; 2. Let AI to reference [linuxmirrors's script](https://github.com/SuperManito/LinuxMirrors/blob/main/ChangeMirrors.sh) of collect_system_info and and migrate to this bash.
+- **v1.1.6:** Update script when firewall is disable or in stop state, it will not start it up and add those settings.
