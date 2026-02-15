@@ -57,3 +57,8 @@ Please open an issue before submitting a PR if you want to discuss a change, esp
 - **v1.1.4:** Repair display error on RHEL when firewall is configured.
 - **v1.1.5:** 1. script run with display OS version; 2. Let AI to reference [linuxmirrors's script](https://github.com/SuperManito/LinuxMirrors/blob/main/ChangeMirrors.sh) of collect_system_info and and migrate to this bash.
 - **v1.1.6:** Update script when firewall is disable or in stop state, it will not start it up and add those settings.
+
+## Others
+If you're using the Cisco AnyConnect Client on Windows, it installs a startup service called "Cisco AnyConnect Secure Mobility Agent" (aka vpnagent.exe).
+You can change this service’s startup type to Manual, but doing so will prevent the Cisco AnyConnect GUI (vpnui.exe) from launching—since it depends on the service being running.
+In that case, a simple launcher script like "VPN Cisco AnyConnect Launcher.bat" can save you time by automatically starting the service before launching the client.
